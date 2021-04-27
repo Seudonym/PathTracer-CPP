@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <chrono>
 
 #include "CustomMath.h"
 #include "Solid.h"
@@ -62,15 +63,31 @@ vec3 color(Ray& ray, Solid* world, int depth) {
 }
 
 int main() {
+	rndSeed(21221);
+	const int imageWidth = 400, imageHeight = 400;
+	const int SPP = 300;
+	const float aspect = (float)imageWidth / (float)imageHeight;
+	const char* skybox = "skybox2.png";
 
-	if (!loadImage("skybox.png")) {
+	std::cout << "================================================\n";
+	std::cout << "Width = " << imageWidth << "	" << "Height = " << imageHeight;
+	std::cout << "\nAspect ratio = " << aspect;
+	std::cout << "\nSamples per pixel = " << SPP;
+	std::cout << "\nSkybox = " << skybox << std::endl;
+	std::cout << "================================================\n";
+
+	std::cout << "Loading skybox...\n";
+	auto SKYBOX_START = std::chrono::high_resolution_clock::now();
+	if (!loadImage(skybox)) {
 		std::cout << "Failed to load skybox.\n";
+	} else {
+		std::cout << "Skybox loaded successfully in ";
+		auto SKYBOX_END = std::chrono::high_resolution_clock::now();
+		auto SKYBOX_ELAPSED = std::chrono::duration_cast<std::chrono::milliseconds>(SKYBOX_END - SKYBOX_START);
+		std::cout << SKYBOX_ELAPSED.count() * 1e-3 << " seconds.\n";
 	}
-	else { std::cout << "Skybox loaded.\n"; }
-
-	int imageWidth = 1280, imageHeight = 720;
-	int SPP = 275;
-	float aspect = (float)imageWidth / (float)imageHeight;
+	std::wcout << "Skybox resolution = " << w << "x" << h << std::endl;
+	std::cout << "================================================\n";
 
 	std::ofstream image("image.ppm");
 	image << "P3\n" << imageWidth << " " << imageHeight  << " 255\n" << std::endl;
@@ -80,17 +97,20 @@ int main() {
 	float u, v;
 	Ray ray;
 
-	Solid* list[4] = {
-		new Sphere(vec3(0, -100.25, -1), 100, new Lambertian(vec3(0.4))),
-		new Sphere(vec3(-0.5, 0, -1), 0.25, new Lambertian(vec3(1.0, 1.0, 1.0))),
-		new Sphere(vec3(0, 0, -1), 0.25, new Metal(vec3(1.0, 1.0, 1.0), 0.5)),
-		new Sphere(vec3(0.5, 0, -1), 0.25, new Metal(vec3(0.8, 0.8, 0.8), 0)),
+	Solid* list[5] = {
+		new Sphere(vec3(0, -150.5, -2), 150, new Lambertian(vec3(0.4))),
+		new Sphere(vec3(0.51, 0, -2), 0.5, new Lambertian(vec3(1.0, 0.0, 0.0))),
+		new Sphere(vec3(-1.52, 0, -2), 0.5, new Reflective(vec3(1.0, 1.0, 1.0), 0.5)),
+		new Sphere(vec3(-0.51, 0, -2), 0.5, new Transparent(1.4)),
+		new Sphere(vec3(1.52, 0, -2), 0.5, new Reflective(vec3(0.8, 0.8, 0.8), 0)),
 	};
-	Solid* world = new World(list, 4);
+	Solid* world = new World(list, 5);
 
-
+	auto RENDER_START = std::chrono::high_resolution_clock::now();
+	
+#pragma omp parallel for
 	for (int j = 0; j < imageHeight; j++) {
-		std::cout << j << std::endl;
+		//std::cout << "\rRendering " << (int)(j * 100.0 / imageHeight + 1) << "% complete...			(" << j+1 << " of " << imageHeight << ")";
 		for (int i = 0; i < imageWidth; i++) {
 			
 			col = vec3(0.0);
@@ -108,10 +128,15 @@ int main() {
 			col = vec3(sqrt(col.x), sqrt(col.y), sqrt(col.z));
 
 			r = col.x * 255.99, g = col.y * 255.99, b = col.z * 255.99;
+
 			image << r << " " << g << " " << b << std::endl;
 		}
 	}
 
+	auto RENDER_END = std::chrono::high_resolution_clock::now();
+	auto RENDER_ELAPSED = std::chrono::duration_cast<std::chrono::milliseconds>(RENDER_END - RENDER_START);
 
+	std::cout << "\nRendering finished in " << RENDER_ELAPSED.count() * 1e-3 << " seconds.\n";
+	std::cout << "================================================\n";
 	return 0;
 }

@@ -42,7 +42,10 @@ public:
 
 vec3 pointOnRay(const Ray& ray, float t);
 vec3 reflect(const vec3& incident, const vec3& normal);
+bool refract(const vec3& incident, const vec3& normal, float eta, vec3& refracted);
 
-float rnd();
+void rndSeed(int seed);
+inline float rnd();
 vec3 rndDirection();
+float schlickApproximation(float cosine, float ior);
 #endif

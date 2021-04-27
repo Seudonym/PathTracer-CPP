@@ -25,11 +25,18 @@ public:
 	bool scatter(const Ray& ray, const Intersection& intersection, vec3& attenuation, Ray& scattered);
 };
 
-class Metal : public Material {
+class Reflective : public Material {
 public:
 	vec3 albedo;
 	float fuzziness;
-	Metal(const vec3& _albedo, float _fuzziness);
+	Reflective(const vec3& _albedo, float _fuzziness);
+	bool scatter(const Ray& ray, const Intersection& intersection, vec3& attenuation, Ray& scattered);
+};
+
+class Transparent : public Material {
+public:
+	float ior;
+	Transparent(float _ior);
 	bool scatter(const Ray& ray, const Intersection& intersection, vec3& attenuation, Ray& scattered);
 };
 

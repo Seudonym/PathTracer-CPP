@@ -35,9 +35,26 @@ vec3 pointOnRay(const Ray& ray, float t) { return ray.origin + ray.direction * t
 
 vec3 reflect(const vec3& incident, const vec3& normal) { return incident - normal * 2.0 * dot(incident, normal); }
 
+bool refract(const vec3& incident, const vec3& normal, float eta, vec3& refracted) {
+	vec3 I = normalize(incident);
+	vec3 N = normal;
+	float NdotI = dot(N, I);
+	float k = 1.0 - eta * eta * (1.0 - NdotI * NdotI);
+	if (k > 0) {
+		refracted = (I - N * NdotI) * eta - N * sqrt(k);
+		return true;
+	}
+	return false;
+}
+
+
 // Utility functions:
-float rnd() {
-	return (float)rand() / (RAND_MAX + 1.0);
+static unsigned int g_seed;
+void rndSeed(int seed) { g_seed = seed; }
+inline float rnd() {
+	//return (float)rand() / (RAND_MAX + 1.0);
+	g_seed = (214013 * g_seed + 2531011);
+	return ((g_seed >> 16) & 0x7FFF) / 32767.0;
 }
 
 vec3 rndDirection() {
@@ -46,4 +63,10 @@ vec3 rndDirection() {
 		p = vec3(rnd(), rnd(), rnd()) * 2.0 - vec3(1, 1, 1);
 	} while (sqLength(p) >= 1.0);
 	return p;
+}
+
+float schlickApproximation(float cosine, float ior) {
+	float r0 = (1 - ior) / (1 + ior);
+	r0 = r0 * r0;
+	return r0 + (1 - r0) * pow(1 - cosine, 5);
 }

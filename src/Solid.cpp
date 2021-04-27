@@ -1,6 +1,6 @@
 #include "Solid.h"
 
-const vec3 EPSILON(0.0001);
+#define EPSILON 0.0001
 
 // Materials:
 //=============================================================================================
@@ -12,12 +12,39 @@ bool Lambertian::scatter(const Ray& ray, const Intersection& intersection, vec3&
 	return true;
 }
 
-Metal::Metal(const vec3& _albedo, float _fuzziness) : albedo(_albedo), fuzziness(_fuzziness) {}
-bool Metal::scatter(const Ray& ray, const Intersection& intersection, vec3& attenuation, Ray& scattered) {
+Reflective::Reflective(const vec3& _albedo, float _fuzziness) : albedo(_albedo), fuzziness(_fuzziness) {}
+bool Reflective::scatter(const Ray& ray, const Intersection& intersection, vec3& attenuation, Ray& scattered) {
 	vec3 target = reflect(normalize(ray.direction), intersection.normal);
 	scattered = Ray(intersection.point + intersection.normal * EPSILON, target + rndDirection() * fuzziness);
 	attenuation = albedo;
 	return dot(scattered.direction, intersection.normal);
+}
+
+Transparent::Transparent(float _ior) : ior(_ior) {}
+bool Transparent::scatter(const Ray& ray, const Intersection& intersection, vec3& attenuation, Ray& scattered) {
+	vec3 normal;
+	vec3 reflected = reflect(ray.direction, intersection.normal);
+	float eta;		// eta = eta1 / eta2	1 is the incident medium, 2 is the refracted medium
+	attenuation = vec3(1.0);
+
+	if (dot(ray.direction, intersection.normal) > 0) {
+		// If ray inside, flip normal. eta1 / eta2 = ior
+		normal = intersection.normal * -1;
+		eta = ior;
+	}
+	else {
+		// If outside, dont change normal, eta1/eta2 = 1/ior
+		normal = intersection.normal;
+		eta = 1.0 / ior;
+	}
+
+	vec3 refracted;
+	if (refract(ray.direction, normal, eta, refracted)) scattered = Ray(intersection.point - normal * EPSILON, refracted);
+	else {
+		scattered = Ray(intersection.point, reflected);
+		return false;
+	}
+	return true;
 }
 
 
@@ -32,7 +59,7 @@ bool Sphere::intersect(const Ray& ray, float tMin, float tMax, Intersection& int
 	float b = 2.0 * dot(ray.direction, OC);
 	float c = dot(OC, OC) - radius * radius;
 	float discriminant = b * b - 4.0 * a * c;
-	
+
 	if (discriminant > 0) {
 		float sqrtDiscriminant = sqrt(discriminant);
 		float temp = (-b - sqrtDiscriminant) / (2.0 * a);
