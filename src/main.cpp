@@ -2,13 +2,13 @@
 #include <fstream>
 #include <vector>
 #include <chrono>
+#include <thread>
 
 #include "CustomMath.h"
 #include "Solid.h"
 #include "World.h"
 
 #define PI 3.1415926
-
 
 #pragma region SKYBOX_LOADER
 extern "C" {
@@ -62,12 +62,63 @@ vec3 color(Ray& ray, Solid* world, int depth) {
 	}
 }
 
+
+const int imageWidth = 400, imageHeight = 400;
+const int SPP = 300;
+const float aspect = (float)imageWidth / (float)imageHeight;
+float pixel[imageWidth][imageHeight][3];
+
+Solid* list[5] = {
+	new Sphere(vec3(0, -150.5, -2), 150, new Lambertian(vec3(0.4))),
+	new Sphere(vec3(0.51, 0, -2), 0.5, new Lambertian(vec3(1.0, 0.0, 0.0))),
+	new Sphere(vec3(-1.52, 0, -2), 0.5, new Reflective(vec3(1.0, 1.0, 1.0), 0.5)),
+	new Sphere(vec3(-0.51, 0, -2), 0.5, new Transparent(1.4)),
+	new Sphere(vec3(1.52, 0, -2), 0.5, new Reflective(vec3(0.8, 0.8, 0.8), 0)),
+};
+Solid* world = new World(list, 5);
+
+
+void execThread(int y1, int y2, int x1, int x2) {
+	vec3 col;
+	float r, g, b;
+	float u, v;
+	Ray ray;
+	
+	for (int j = y1; j < y2; j++) {
+		//std::cout << "\rRendering " << (int)(j * 100.0 / imageHeight + 1) << "% complete...			(" << j+1 << " of " << imageHeight << ")";
+		for (int i = x1; i < x2; i++) {
+			for (int s = 0; s < SPP; s++) {
+
+				u = (float)(i + rnd()) * 2.0 / imageWidth - 1.0;
+				v = 1.0 - (float)(j + rnd()) * 2.0 / imageHeight;
+				u = u * aspect;
+
+				ray = Ray(vec3(0.0), vec3(u, v, -1.0));
+				col = col + color(ray, world, 0);
+			}
+			col = col / (float)SPP;
+
+			col = vec3(sqrt(col.x), sqrt(col.y), sqrt(col.z));
+
+			r = col.x * 255.99, g = col.y * 255.99, b = col.z * 255.99;
+
+			pixel[i][j][0] = r;
+			pixel[i][j][1] = g;
+			pixel[i][j][2] = b;
+
+		
+			//image << r << " " << g << " " << b << std::endl;
+		}
+	}
+
+
+}
+
+
 int main() {
 	rndSeed(21221);
-	const int imageWidth = 400, imageHeight = 400;
-	const int SPP = 300;
-	const float aspect = (float)imageWidth / (float)imageHeight;
 	const char* skybox = "skybox2.png";
+
 
 	std::cout << "================================================\n";
 	std::cout << "Width = " << imageWidth << "	" << "Height = " << imageHeight;
@@ -86,57 +137,38 @@ int main() {
 		auto SKYBOX_ELAPSED = std::chrono::duration_cast<std::chrono::milliseconds>(SKYBOX_END - SKYBOX_START);
 		std::cout << SKYBOX_ELAPSED.count() * 1e-3 << " seconds.\n";
 	}
-	std::wcout << "Skybox resolution = " << w << "x" << h << std::endl;
+	std::cout << "Skybox resolution = " << w << "x" << h << std::endl;
 	std::cout << "================================================\n";
 
-	std::ofstream image("image.ppm");
-	image << "P3\n" << imageWidth << " " << imageHeight  << " 255\n" << std::endl;
-
-	vec3 col;
-	float r, g, b;
-	float u, v;
-	Ray ray;
-
-	Solid* list[5] = {
-		new Sphere(vec3(0, -150.5, -2), 150, new Lambertian(vec3(0.4))),
-		new Sphere(vec3(0.51, 0, -2), 0.5, new Lambertian(vec3(1.0, 0.0, 0.0))),
-		new Sphere(vec3(-1.52, 0, -2), 0.5, new Reflective(vec3(1.0, 1.0, 1.0), 0.5)),
-		new Sphere(vec3(-0.51, 0, -2), 0.5, new Transparent(1.4)),
-		new Sphere(vec3(1.52, 0, -2), 0.5, new Reflective(vec3(0.8, 0.8, 0.8), 0)),
-	};
-	Solid* world = new World(list, 5);
-
+	std::cout << "Rendering started..." << std::endl;
 	auto RENDER_START = std::chrono::high_resolution_clock::now();
+
+	std::thread t1(execThread, 0, imageHeight/2, 0, imageWidth/2);
+	std::thread t2(execThread, 0, imageHeight/2, imageWidth/2, imageWidth);
+	std::thread t3(execThread, imageHeight/2, imageHeight, 0, imageWidth / 2);
+	std::thread t4(execThread, imageHeight/2, imageHeight, imageWidth / 2, imageWidth);
 	
-#pragma omp parallel for
-	for (int j = 0; j < imageHeight; j++) {
-		//std::cout << "\rRendering " << (int)(j * 100.0 / imageHeight + 1) << "% complete...			(" << j+1 << " of " << imageHeight << ")";
-		for (int i = 0; i < imageWidth; i++) {
-			
-			col = vec3(0.0);
-			for (int s = 0; s < SPP; s++) {
-				
-				u = (float)(i + rnd()) * 2.0 / imageWidth - 1.0;
-				v = 1.0 - (float)(j + rnd()) * 2.0 / imageHeight;
-				u = u * aspect;
+	t1.join();
+	t2.join();
+	t3.join();
+	t4.join();
 
-				ray = Ray(vec3(0.0), vec3(u, v, -1.0));
-				col = col + color(ray, world, 0);
-			}
-			col = col / (float)SPP;
-
-			col = vec3(sqrt(col.x), sqrt(col.y), sqrt(col.z));
-
-			r = col.x * 255.99, g = col.y * 255.99, b = col.z * 255.99;
-
-			image << r << " " << g << " " << b << std::endl;
-		}
-	}
+	
 
 	auto RENDER_END = std::chrono::high_resolution_clock::now();
 	auto RENDER_ELAPSED = std::chrono::duration_cast<std::chrono::milliseconds>(RENDER_END - RENDER_START);
-
 	std::cout << "\nRendering finished in " << RENDER_ELAPSED.count() * 1e-3 << " seconds.\n";
-	std::cout << "================================================\n";
+
+	auto WRITE_START = std::chrono::high_resolution_clock::now();
+	std::cout << "Writing render to image...\n";
+	std::ofstream image("image.ppm");
+	image << "P3\n" << imageWidth << " " << imageHeight << "\n255\n";
+	for (int j = 0; j < imageHeight; j++) {
+		for (int i = 0; i < imageWidth; i++) {
+			image << pixel[i][j][0] << " " << pixel[i][j][1] << " " << pixel[i][j][2] << "\n";
+		}
+	}
+	std::cout << "Write complete in" << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - WRITE_START).count()*1e-3;
+
 	return 0;
 }
