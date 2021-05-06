@@ -10,6 +10,6 @@ An example render(1024x720):
 * A proper camera
 * Depth of field
 * An ADS lighting system
-* Multi-threading
+* ~Multi-threading~
 * Denoising(low priority)
 
