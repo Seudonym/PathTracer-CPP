@@ -7,9 +7,5 @@ An example render(1024x720):
 # TODO
 * ~Skyboxes~
 * ~Transparent materials~
-* A proper camera
-* Depth of field
-* An ADS lighting system
 * ~Multi-threading~
-* Denoising(low priority)
 
